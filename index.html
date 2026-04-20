@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Attendance Dashboard 2026</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;background:#f4f6f9;color:#1a1a1a}
+    .dash{padding:1.5rem;max-width:1600px;margin:0 auto}
+
+    /* TOP BAR */
+    .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem;flex-wrap:wrap;gap:10px}
+    .topbar h1{font-size:20px;font-weight:700}
+
+    /* MONTH DROPDOWN */
+    .month-select-wrap{display:flex;align-items:center;gap:10px}
+    .month-select-wrap label{font-size:13px;color:#555;font-weight:600}
+    select#monthDrop{padding:7px 14px;border:1.5px solid #bbb;border-radius:8px;font-size:14px;font-weight:600;color:#1a1a1a;background:#fff;cursor:pointer;outline:none;min-width:160px}
+    select#monthDrop:focus{border-color:#378ADD}
+
+    /* TABS */
+    .tabs{display:flex;gap:6px;flex-wrap:wrap}
+    .tab{padding:6px 14px;border:1px solid #ccc;border-radius:7px;font-size:12px;cursor:pointer;background:#fff;color:#555}
+    .tab.active{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+
+    /* EXPORT */
+    .export-btn{padding:7px 14px;border:1px solid #bbb;border-radius:7px;font-size:12px;cursor:pointer;background:#fff;color:#1a1a1a;font-weight:600}
+    .export-btn:hover{background:#f0f0f0}
+
+    /* METRICS */
+    .metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:1.2rem}
+    .metric{background:#e8edf3;border-radius:8px;padding:.75rem 1rem}
+    .metric .label{font-size:11px;color:#666;margin-bottom:3px}
+    .metric .val{font-size:22px;font-weight:700;color:#1a1a1a}
+
+    /* PANELS */
+    .panels{display:grid;grid-template-columns:1fr 300px;gap:14px;margin-bottom:1.2rem}
+    .card{background:#fff;border:1px solid #e0e0e0;border-radius:12px;padding:.9rem 1.1rem}
+    .card h2{font-size:11px;font-weight:700;color:#666;margin-bottom:.8rem;text-transform:uppercase;letter-spacing:.5px}
+    .chart-wrap{position:relative;width:100%;height:200px}
+
+    /* DEFAULTER */
+    .def-list{display:flex;flex-direction:column;gap:5px;max-height:200px;overflow-y:auto}
+    .def-row{display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:6px;background:#f4f6f9}
+    .def-name{font-size:12px;color:#1a1a1a}
+    .def-badge{font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px;background:#FCEBEB;color:#A32D2D}
+
+    /* GRID */
+    .grid-outer{overflow-x:auto;max-height:520px;overflow-y:auto;border-radius:8px;border:1px solid #e0e0e0}
+    table.att{border-collapse:collapse;font-size:11px;width:100%}
+    table.att thead tr th{background:#f4f6f9;color:#555;padding:7px 6px;white-space:nowrap;text-align:center;border-bottom:1.5px solid #d0d0d0;position:sticky;top:0;z-index:3}
+    table.att thead tr th.name-col{text-align:left;position:sticky;left:0;z-index:4;background:#f4f6f9;min-width:140px}
+    table.att thead tr th.bill-col{background:#e8f7f2;color:#0F6E56;min-width:90px;font-weight:700}
+    table.att thead tr th.remark-col{background:#f0f4ff;color:#185FA5;min-width:160px;font-weight:700}
+    table.att thead tr th.month-col{background:#fff4e6;color:#a65d00;min-width:80px;font-weight:700}
+    table.att td{padding:4px 5px;text-align:center;border-bottom:1px solid #f0f0f0;vertical-align:middle}
+    table.att td.name-col{text-align:left;position:sticky;left:0;background:#fff;z-index:2;font-size:12px;white-space:nowrap;padding:3px 12px 3px 8px;color:#1a1a1a;border-right:1px solid #e8e8e8}
+    table.att td.bill-col{background:#f4fbf8;font-weight:700;color:#0F6E56;font-size:12px}
+    table.att td.remark-col{background:#f7f9ff;padding:3px 6px}
+    table.att td.month-col{background:#fffaf5;color:#a65d00;font-weight:600}
+    table.att tr:hover td{background:#f9fafb}
+    table.att tr:hover td.name-col{background:#f9fafb}
+    table.att tr:hover td.bill-col{background:#e8f7f2}
+    table.att tr:hover td.remark-col{background:#eef2ff}
+
+    /* CHECKBOXES */
+    .cb{width:19px;height:19px;border:2px solid #888;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s;flex-shrink:0;background:#fff}
+    .cb:hover:not(.future){border-color:#1D9E75;background:#e8f7f2}
+    .cb.checked{background:#1D9E75;border-color:#1D9E75}
+    .cb.checked::after{content:'';display:block;width:4px;height:8px;border:2px solid #fff;border-top:none;border-left:none;transform:rotate(45deg) translate(-1px,-1px)}
+    .cb.today{border-color:#378ADD;box-shadow:0 0 0 2px #b5d4f4}
+    .cb.future{opacity:.25;cursor:default;pointer-events:none;background:#f5f5f5}
+    .date-sub{font-size:9px;color:#999;display:block}
+
+    /* REMARK INPUT */
+    .remark-input{width:100%;border:1px solid #d0d8f0;border-radius:5px;padding:3px 7px;font-size:11px;color:#1a1a1a;background:#fff;outline:none;font-family:Arial,sans-serif}
+    .remark-input:focus{border-color:#378ADD;background:#f0f7ff}
+
+    /* LOGS */
+    .log-entries{max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:4px}
+    .log-entry{font-size:11px;color:#444;padding:4px 9px;background:#f4f6f9;border-radius:4px;font-family:monospace}
+
+    /* WEEKLY */
+    .week-grid{display:flex;flex-direction:column;gap:10px}
+    .week-block{border:1px solid #e0e0e0;border-radius:8px;overflow:hidden}
+    .week-header{background:#f4f6f9;padding:7px 12px;font-size:12px;font-weight:700;color:#555;display:flex;justify-content:space-between;align-items:center}
+    .week-rate{font-size:11px;color:#1D9E75;font-weight:700}
+    table.week-tbl{width:100%;border-collapse:collapse;font-size:12px}
+    table.week-tbl th{background:#fafafa;color:#888;padding:5px 10px;text-align:left;border-bottom:1px solid #f0f0f0;font-weight:500}
+    table.week-tbl td{padding:5px 10px;border-bottom:1px solid #f9f9f9;color:#1a1a1a}
+    table.week-tbl tr:last-child td{border-bottom:none}
+    .bar-bg{background:#e8edf3;border-radius:4px;height:7px;width:90px;display:inline-block;vertical-align:middle}
+    .bar-fill{background:#1D9E75;border-radius:4px;height:7px;display:block}
+    .bar-fill.low{background:#E24B4A}
+    .bar-fill.mid{background:#EF9F27}
+
+    @media(max-width:900px){
+      .metrics{grid-template-columns:repeat(3,1fr)}
+      .panels{grid-template-columns:1fr}
+    }
+    @media(max-width:600px){
+      .metrics{grid-template-columns:repeat(2,1fr)}
+    }
+  </style>
+</head>
+<body>
+<div class="dash">
+
+  <div class="topbar">
+    <h1>📅 Attendance Dashboard 2026</h1>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div class="month-select-wrap">
+        <label for="monthDrop">Month:</label>
+        <select id="monthDrop" onchange="onMonthChange(this.value)">
+          <option value="0">January 2026</option>
+          <option value="1">February 2026</option>
+          <option value="2">March 2026</option>
+          <option value="3" selected>April 2026</option>
+          <option value="4">May 2026</option>
+          <option value="5">June 2026</option>
+          <option value="6">July 2026</option>
+          <option value="7">August 2026</option>
+          <option value="8">September 2026</option>
+          <option value="9">October 2026</option>
+          <option value="10">November 2026</option>
+          <option value="11">December 2026</option>
+        </select>
+      </div>
+      <button class="export-btn" onclick="exportCSV()">↓ Export CSV</button>
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('frontend',this)">Front end</button>
+        <button class="tab" onclick="switchTab('backend',this)">Back end</button>
+        <button class="tab" onclick="switchTab('weekly',this)">Weekly</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="metrics">
+    <div class="metric"><div class="label">Total members</div><div class="val" id="m-total">0</div></div>
+    <div class="metric"><div class="label">Present today</div><div class="val" id="m-today">0</div></div>
+    <div class="metric"><div class="label">Check-ins this month</div><div class="val" id="m-month">0</div></div>
+    <div class="metric"><div class="label">Year total check-ins</div><div class="val" id="m-year">0</div></div>
+    <div class="metric"><div class="label">Defaulters this month</div><div class="val" id="m-def" style="color:#A32D2D">0</div></div>
+  </div>
+
+  <div class="panels">
+    <div class="card">
+      <h2>Daily attendance — check-ins per day</h2>
+      <div class="chart-wrap"><canvas id="barChart" role="img" aria-label="Daily check-ins">Daily attendance</canvas></div>
+    </div>
+    <div class="card">
+      <h2>Defaulter list (most missed this month)</h2>
+      <div class="def-list" id="defList"><div style="font-size:12px;color:#999">No defaulters yet.</div></div>
+    </div>
+  </div>
+
+  <div id="frontend-section">
+    <div class="card" style="padding:.9rem 1.1rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.8rem;flex-wrap:wrap;gap:8px">
+        <h2 style="margin:0">Attendance grid — click to check/uncheck</h2>
+        <span id="grid-month-label" style="font-size:12px;color:#378ADD;font-weight:700"></span>
+      </div>
+      <div class="grid-outer">
+        <table class="att" id="attTable"></table>
+      </div>
+    </div>
+  </div>
+
+  <div id="backend-section" style="display:none">
+    <div class="card">
+      <h2>Check-in log — <span id="log-month-label"></span></h2>
+      <div class="log-entries" id="logEntries"><div style="font-size:12px;color:#999">No check-ins yet.</div></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h2>Defaulter audit log</h2>
+      <div class="log-entries" id="defLog"><div style="font-size:12px;color:#999">No defaulters flagged.</div></div>
+    </div>
+  </div>
+
+  <div id="weekly-section" style="display:none">
+    <div class="card">
+      <h2>Weekly attendance summary — <span id="weekly-month-label"></span></h2>
+      <div class="week-grid" id="weekGrid"></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const NAMES = [
+  'Alice Johnson','Bob Smith','Carol White','David Lee','Emma Davis',
+  'Frank Brown','Grace Kim','Henry Chen','Iris Patel','James Wilson',
+  'Karen Moore','Liam Taylor','Mia Anderson','Noah Thomas','Olivia Jackson',
+  'Paul Harris','Quinn Martin','Rachel Garcia','Sam Martinez','Tina Robinson',
+  'Uma Clark','Victor Lewis','Wendy Walker','Xander Hall','Yara Allen',
+  'Zach Young','Amara Scott','Ben King','Chloe Wright','Dylan Hill'
+];
+
+const YEAR = 2026;
+const MONTHS_LONG  = ['January','February','March','April','May','June',
+                      'July','August','September','October','November','December'];
+const DAYS_SHORT   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+let realToday = new Date();
+realToday.setHours(0,0,0,0);
+let currentMo = 3; 
+let currentTab = 'frontend';
+let attendance = {};
+let checkInLog = [];
+let remarks    = {};
+
+try {
+  const s = localStorage.getItem('att2026_data');
+  const l = localStorage.getItem('att2026_log');
+  const r = localStorage.getItem('att2026_remarks');
+  if(s) attendance = JSON.parse(s);
+  if(l) checkInLog  = JSON.parse(l);
+  if(r) remarks      = JSON.parse(r);
+} catch(e){}
+
+function daysInMo(mo){ return new Date(YEAR, mo+1, 0).getDate(); }
+function dateKey(mo,d){ return YEAR+'-'+String(mo+1).padStart(2,'0')+'-'+String(d).padStart(2,'0'); }
+function attKey(name,mo,d){ return name+'|'+dateKey(mo,d); }
+function remarkKey(name,mo){ return name+'|'+mo; }
+function isWeekend(mo,d){ return [0,6].includes(new Date(YEAR,mo,d).getDay()); }
+function isFuture(mo,d) { return new Date(YEAR,mo,d) > realToday; }
+function isToday(mo,d)  { return new Date(YEAR,mo,d).getTime()===realToday.getTime(); }
+
+function billableDays(name, mo){
+  let cnt=0;
+  for(let d=1;d<=daysInMo(mo);d++){
+    if(attendance[attKey(name,mo,d)]) cnt++;
+  }
+  return cnt;
+}
+
+function saveState(){
+  localStorage.setItem('att2026_data', JSON.stringify(attendance));
+  localStorage.setItem('att2026_log', JSON.stringify(checkInLog));
+  localStorage.setItem('att2026_remarks', JSON.stringify(remarks));
+}
+
+function buildTable(){
+  const mo = currentMo;
+  const dim = daysInMo(mo);
+  const tbl = document.getElementById('attTable');
+
+  let head = '<thead><tr><th class="name-col">Name</th>';
+  for(let d=1;d<=dim;d++){
+    const wd = DAYS_SHORT[new Date(YEAR,mo,d).getDay()];
+    const wknd = isWeekend(mo,d);
+    const tod = isToday(mo,d);
+    head += `<th${wknd?' style="opacity:.4"':''}${tod?' style="color:#378ADD;font-weight:700"':''}>
+      ${d}<span class="date-sub">${wd}</span></th>`;
+  }
+  head += '<th class="bill-col">Total Days</th><th class="remark-col">Remarks</th><th class="month-col">Month</th></tr></thead>';
+
+  let body = '<tbody>';
+  NAMES.forEach(name => {
+    const safe = name.replace(/'/g,"\\'");
+    const bd = billableDays(name, mo);
+    const rem = remarks[remarkKey(name,mo)] || '';
+    body += `<tr><td class="name-col">${name}</td>`;
+
+    for(let d=1;d<=dim;d++){
+      const key = attKey(name,mo,d);
+      const checked = !!attendance[key];
+      const fut = isFuture(mo,d);
+      const wknd = isWeekend(mo,d);
+      const tod = isToday(mo,d);
+
+      let cls = 'cb';
+      if(checked) cls += ' checked';
+      if(tod) cls += ' today';
+      if(fut) cls += ' future';
+
+      const tdStyle = wknd ? ' style="background:#f0f0f0;opacity:.5"' : '';
+      const onclick = (!fut && !wknd) ? `onclick="toggle('${safe}',${mo},${d},this)"` : '';
+      body += `<td${tdStyle}><div class="${cls}" ${onclick}></div></td>`;
+    }
+
+    body += `<td class="bill-col" id="bill-${name.replace(/\s/g,'_')}-${mo}">${bd}</td>`;
+    body += `<td class="remark-col"><input class="remark-input" type="text" value="${rem.replace(/"/g,'&quot;')}" onchange="saveRemark('${safe}',${mo},this.value)"/></td>`;
+    body += `<td class="month-col">${MONTHS_LONG[mo]}</td></tr>`;
+  });
+  tbl.innerHTML = head + body + '</tbody>';
+}
+
+function toggle(name, mo, d, el){
+  const key = attKey(name,mo,d);
+  const dateStr = dateKey(mo,d);
+  
+  if(attendance[key]) {
+    // Uncheck logic
+    delete attendance[key];
+    el.classList.remove('checked');
+    // Remove from log
+    checkInLog = checkInLog.filter(entry => !(entry.name === name && entry.date === dateStr));
+  } else {
+    // Check logic
+    attendance[key] = true;
+    el.classList.add('checked');
+    const now = new Date();
+    const t = now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    checkInLog.unshift({name, date:dateStr, time:t, mo});
+  }
+
+  const bd = billableDays(name, mo);
+  const bc = document.getElementById(`bill-${name.replace(/\s/g,'_')}-${mo}`);
+  if(bc) bc.textContent = bd;
+
+  saveState();
+  updateAll();
+}
+
+function saveRemark(name, mo, val){
+  remarks[remarkKey(name, mo)] = val;
+  saveState();
+}
+
+// ... (Other functions updateMetrics, updateChart, etc. remain the same as your source) ...
+
+function onMonthChange(val){ currentMo = parseInt(val); refreshAll(); }
+function syncDropdown(){
+  document.getElementById('monthDrop').value = String(currentMo);
+  const lbl = MONTHS_LONG[currentMo]+' '+YEAR;
+  document.getElementById('grid-month-label').textContent = lbl;
+  document.getElementById('log-month-label').textContent = lbl;
+  document.getElementById('weekly-month-label').textContent = lbl;
+}
+
+function updateMetrics(){
+  const mo = currentMo;
+  document.getElementById('m-total').textContent = NAMES.length;
+  let todayCnt = 0;
+  if(realToday.getFullYear()===YEAR && realToday.getMonth()===mo){
+    NAMES.forEach(n => { if(attendance[attKey(n,mo,realToday.getDate())]) todayCnt++; });
+  }
+  document.getElementById('m-today').textContent = todayCnt;
+  let moTotal = 0;
+  for(let d=1;d<=daysInMo(mo);d++){
+    NAMES.forEach(n => { if(attendance[attKey(n,mo,d)]) moTotal++; });
+  }
+  document.getElementById('m-month').textContent = moTotal;
+  document.getElementById('m-year').textContent = Object.values(attendance).filter(Boolean).length;
+  document.getElementById('m-def').textContent = computeDefaulters(mo).length;
+}
+
+function computeDefaulters(mo){
+  const wds = [];
+  for(let d=1;d<=daysInMo(mo);d++){ if(!isWeekend(mo,d) && !isFuture(mo,d)) wds.push(d); }
+  const missed = {};
+  NAMES.forEach(name => {
+    let m = 0;
+    wds.forEach(d => { if(!attendance[attKey(name,mo,d)]) m++; });
+    if(m > 0) missed[name] = m;
+  });
+  return Object.entries(missed).sort((a,b) => b[1]-a[1]);
+}
+
+let chartInst = null;
+function updateChart(){
+  const mo = currentMo;
+  const labels=[], data=[];
+  for(let d=1;d<=daysInMo(mo);d++){
+    if(isWeekend(mo,d)||isFuture(mo,d)) continue;
+    labels.push(String(d));
+    let cnt=0;
+    NAMES.forEach(n=>{ if(attendance[attKey(n,mo,d)]) cnt++; });
+    data.push(cnt);
+  }
+  if(chartInst) chartInst.destroy();
+  const ctx = document.getElementById('barChart');
+  if(!ctx) return;
+  chartInst = new Chart(ctx,{
+    type:'bar',
+    data:{labels,datasets:[{
+      label:'Check-ins',data,
+      backgroundColor:labels.map(l=>isToday(mo,+l)?'#1D9E75':'#B5D4F4'),
+      borderColor:labels.map(l=>isToday(mo,+l)?'#0F6E56':'#378ADD'),
+      borderWidth:1,borderRadius:3
+    }]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{display:false},ticks:{font:{size:10},autoSkip:false,maxRotation:0}},
+        y:{beginAtZero:true,max:NAMES.length,ticks:{stepSize:5},grid:{color:'rgba(0,0,0,.05)'}}
+      }
+    }
+  });
+}
+
+function updateDefaulterList(){
+  const mo = currentMo;
+  const defs = computeDefaulters(mo);
+  const list = document.getElementById('defList');
+  if(list) list.innerHTML = defs.length ? defs.map(([n,m])=>`<div class="def-row"><span class="def-name">${n}</span><span class="def-badge">${m} missed</span></div>`).join('') : '<div style="font-size:12px;color:#999">No defaulters yet.</div>';
+}
+
+function updateLog(){
+  const mo = currentMo;
+  const filtered = checkInLog.filter(e=>e.mo===mo);
+  const log = document.getElementById('logEntries');
+  if(log) log.innerHTML = filtered.length ? filtered.slice(0,50).map(e=>`<div class="log-entry">LOG | ${e.name} | ${e.date} | ${e.time}</div>`).join('') : '<div style="font-size:12px;color:#999">No activity.</div>';
+}
+
+function refreshAll(){ syncDropdown(); buildTable(); updateAll(); }
+function updateAll(){ updateMetrics(); updateChart(); updateDefaulterList(); updateLog(); }
+function switchTab(tab,btn){
+  currentTab=tab;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('frontend-section').style.display = tab==='frontend'?'block':'none';
+  document.getElementById('backend-section').style.display  = tab==='backend' ?'block':'none';
+  document.getElementById('weekly-section').style.display   = tab==='weekly'  ?'block':'none';
+}
+
+refreshAll();
+</script>
+</body>
+</html>
