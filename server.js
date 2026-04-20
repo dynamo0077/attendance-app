@@ -1,78 +1,185 @@
-const express = require('express');
-const path = require('path');
-const fs = require('fs');
-const ExcelJS = require('exceljs');
-const { Mutex } = require('async-mutex');
+require('dotenv').config();
+const express    = require('express');
+const path       = require('path');
+const jwt        = require('jsonwebtoken');
+const bcrypt     = require('bcryptjs');
+const ExcelJS    = require('exceljs');
+const { createClient } = require('@supabase/supabase-js');
 
-const app = express();
+const app  = express();
 const PORT = process.env.PORT || 3000;
-const EXCEL_FILE_PATH = path.join(__dirname, 'data.xlsx');
-const mutex = new Mutex();
 
+// ─── Supabase client (service_role bypasses RLS — admin only) ────────────────
+const supabase = createClient(
+    process.env.SUPABASE_URL      || 'https://placeholder.supabase.co',
+    process.env.SUPABASE_SERVICE_KEY || 'placeholder-key'
+);
+
+// ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.post('/api/submit', async (req, res) => {
-    const { name, email, department, message } = req.body;
+// ─── Auth Middleware ──────────────────────────────────────────────────────────
+function requireAdmin(req, res, next) {
+    const auth = req.headers['authorization'] || '';
+    // Also accept token via query string (needed for browser-triggered downloads)
+    const token = (auth.startsWith('Bearer ') ? auth.slice(7) : null) || req.query.token || null;
+    if (!token) return res.status(401).json({ success: false, error: 'No token provided.' });
+    try {
+        req.admin = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret-change-me');
+        next();
+    } catch {
+        res.status(401).json({ success: false, error: 'Invalid or expired token.' });
+    }
+}
 
+// ─── PUBLIC: Submit attendance ────────────────────────────────────────────────
+// POST /api/submit
+// Anyone with the link can submit. They receive only their own confirmation.
+app.post('/api/submit', async (req, res) => {
+    const { name, email, department, role, phone, notes } = req.body;
     if (!name || !email) {
         return res.status(400).json({ success: false, error: 'Name and Email are required.' });
     }
+    const { data, error } = await supabase
+        .from('attendance')
+        .insert([{ name, email, department: department || '', role: role || '', phone: phone || '', notes: notes || '' }])
+        .select('id, name, email')
+        .single();
 
-    const release = await mutex.acquire();
-    try {
-        const workbook = new ExcelJS.Workbook();
-        let worksheet;
-
-        if (fs.existsSync(EXCEL_FILE_PATH)) {
-            // Read existing file
-            await workbook.xlsx.readFile(EXCEL_FILE_PATH);
-            worksheet = workbook.getWorksheet(1);
-            if (!worksheet) {
-                worksheet = workbook.addWorksheet('Submissions');
-                worksheet.columns = [
-                    { header: 'Date', key: 'date', width: 20 },
-                    { header: 'Name', key: 'name', width: 25 },
-                    { header: 'Email', key: 'email', width: 30 },
-                    { header: 'Department', key: 'department', width: 20 },
-                    { header: 'Message', key: 'message', width: 50 },
-                ];
-            }
-        } else {
-            // Create a new file if it doesn't exist
-            worksheet = workbook.addWorksheet('Submissions');
-            worksheet.columns = [
-                { header: 'Date', key: 'date', width: 20 },
-                { header: 'Name', key: 'name', width: 25 },
-                { header: 'Email', key: 'email', width: 30 },
-                { header: 'Department', key: 'department', width: 20 },
-                { header: 'Message', key: 'message', width: 50 },
-            ];
-        }
-
-        // Add the new row
-        worksheet.addRow({
-            date: new Date().toLocaleString(),
-            name,
-            email,
-            department: department || '',
-            message: message || ''
-        });
-
-        // Write directly to the same file path, updating it without creating copies
-        await workbook.xlsx.writeFile(EXCEL_FILE_PATH);
-        
-        res.status(200).json({ success: true, message: 'Data successfully added to Excel file!' });
-    } catch (error) {
-        console.error('Error updating Excel file:', error);
-        res.status(500).json({ success: false, error: 'Internal server error while updating the Excel file.' });
-    } finally {
-        release();
+    if (error) {
+        console.error('Supabase insert error:', error.message);
+        return res.status(500).json({ success: false, error: 'Could not save your submission. Please try again.' });
     }
+    res.status(201).json({ success: true, message: `Thank you, ${name}! Your attendance has been recorded.`, id: data.id });
 });
 
+// ─── ADMIN: Login ─────────────────────────────────────────────────────────────
+// POST /api/admin/login
+app.post('/api/admin/login', async (req, res) => {
+    const { password } = req.body;
+    if (!password) return res.status(400).json({ success: false, error: 'Password required.' });
+
+    const adminPass = process.env.ADMIN_PASSWORD || 'admin123';
+    // Support both plain-text env var and bcrypt hash
+    const valid = adminPass.startsWith('$2')
+        ? await bcrypt.compare(password, adminPass)
+        : password === adminPass;
+
+    if (!valid) {
+        return res.status(401).json({ success: false, error: 'Incorrect password.' });
+    }
+    const token = jwt.sign(
+        { role: 'admin', ts: Date.now() },
+        process.env.JWT_SECRET || 'dev-secret-change-me',
+        { expiresIn: '8h' }
+    );
+    res.json({ success: true, token, expiresIn: '8h' });
+});
+
+// ─── ADMIN: Read all entries ──────────────────────────────────────────────────
+// GET /api/admin/entries
+app.get('/api/admin/entries', requireAdmin, async (req, res) => {
+    const { data, error } = await supabase
+        .from('attendance')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+    if (error) return res.status(500).json({ success: false, error: error.message });
+    res.json({ success: true, data });
+});
+
+// ─── ADMIN: Read one entry ────────────────────────────────────────────────────
+// GET /api/admin/entries/:id
+app.get('/api/admin/entries/:id', requireAdmin, async (req, res) => {
+    const { data, error } = await supabase
+        .from('attendance')
+        .select('*')
+        .eq('id', req.params.id)
+        .single();
+
+    if (error || !data) return res.status(404).json({ success: false, error: 'Entry not found.' });
+    res.json({ success: true, data });
+});
+
+// ─── ADMIN: Update entry ──────────────────────────────────────────────────────
+// PUT /api/admin/entries/:id
+app.put('/api/admin/entries/:id', requireAdmin, async (req, res) => {
+    const { name, email, department, role, phone, notes } = req.body;
+    if (!name || !email) return res.status(400).json({ success: false, error: 'Name and Email are required.' });
+
+    const { error } = await supabase
+        .from('attendance')
+        .update({ name, email, department: department || '', role: role || '', phone: phone || '', notes: notes || '', updated_at: new Date().toISOString() })
+        .eq('id', req.params.id);
+
+    if (error) return res.status(500).json({ success: false, error: error.message });
+    res.json({ success: true, message: `Entry #${req.params.id} updated.` });
+});
+
+// ─── ADMIN: Delete entry ──────────────────────────────────────────────────────
+// DELETE /api/admin/entries/:id
+app.delete('/api/admin/entries/:id', requireAdmin, async (req, res) => {
+    const { error } = await supabase
+        .from('attendance')
+        .delete()
+        .eq('id', req.params.id);
+
+    if (error) return res.status(500).json({ success: false, error: error.message });
+    res.json({ success: true, message: `Entry #${req.params.id} deleted.` });
+});
+
+// ─── ADMIN: Export as Excel ───────────────────────────────────────────────────
+// GET /api/admin/export
+app.get('/api/admin/export', requireAdmin, async (req, res) => {
+    const { data, error } = await supabase
+        .from('attendance')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+    if (error) return res.status(500).json({ success: false, error: error.message });
+
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'Attendance Web App';
+    const ws = wb.addWorksheet('Attendance', { views: [{ state: 'frozen', ySplit: 1 }] });
+
+    ws.columns = [
+        { header: 'ID',         key: 'id',         width: 8  },
+        { header: 'Name',       key: 'name',       width: 25 },
+        { header: 'Email',      key: 'email',      width: 32 },
+        { header: 'Department', key: 'department', width: 20 },
+        { header: 'Role',       key: 'role',       width: 20 },
+        { header: 'Phone',      key: 'phone',      width: 18 },
+        { header: 'Notes',      key: 'notes',      width: 40 },
+        { header: 'Submitted',  key: 'created_at', width: 24 },
+        { header: 'Updated',    key: 'updated_at', width: 24 },
+    ];
+
+    // Style header
+    ws.getRow(1).eachCell(cell => {
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D9E75' } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    });
+    ws.getRow(1).height = 26;
+
+    data.forEach(row => ws.addRow(row));
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="attendance_${new Date().toISOString().slice(0,10)}.xlsx"`);
+    await wb.xlsx.write(res);
+    res.end();
+});
+
+// ─── Admin page route ─────────────────────────────────────────────────────────
+app.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+// ─── Start ────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-    console.log(`Server is running at http://localhost:${PORT}`);
-    console.log(`Data will be written directly to: ${EXCEL_FILE_PATH}`);
+    console.log(`\n✅  Server running at http://localhost:${PORT}`);
+    console.log(`🔒  Admin dashboard: http://localhost:${PORT}/admin`);
+    console.log(`📊  Database: Supabase (${process.env.SUPABASE_URL || 'not configured — set .env'})\n`);
 });
