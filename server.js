@@ -243,6 +243,38 @@ app.put('/api/daily/remark', async (req, res) => {
     res.json({ success: true, message: 'Remark updated' });
 });
 
+// ─── PUBLIC: Employee Check-in (Today) ────────────────────────────────────────
+app.post('/api/check-in', async (req, res) => {
+    const { employee_id, remark } = req.body;
+    if (!employee_id) return res.status(400).json({ success: false, error: 'Employee ID required.' });
+
+    // Determine 'today' purely on the server side
+    const today = new Date().toISOString().split('T')[0];
+
+    // Check if check-in already exists
+    const { data: existing } = await supabase
+        .from('daily_attendance')
+        .select('id')
+        .eq('employee_id', employee_id)
+        .eq('date', today)
+        .single();
+    
+    let error;
+    if (existing) {
+        ({ error } = await supabase
+            .from('daily_attendance')
+            .update({ present: true, remark: remark || '', marked_at: new Date().toISOString() })
+            .eq('id', existing.id));
+    } else {
+        ({ error } = await supabase
+            .from('daily_attendance')
+            .insert([{ employee_id, date: today, present: true, remark: remark || '' }]));
+    }
+
+    if (error) return res.status(500).json({ success: false, error: error.message });
+    res.json({ success: true, message: 'Successfully checked in for today!' });
+});
+
 // ─── ADMIN: Login ─────────────────────────────────────────────────────────────
 // POST /api/admin/login
 app.post('/api/admin/login', async (req, res) => {
@@ -400,8 +432,7 @@ app.get('/api/admin/sync-from-excel', requireAdmin, async (req, res) => {
 
 // ─── Dashboard app & Admin page routes ────────────────────────────────────────
 app.get('/', (req, res) => {
-    // We combine index and dashboard logic. The main UI is now dashboard.html.
-    res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.get('/dashboard', (req, res) => {

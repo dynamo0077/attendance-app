@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Portal - Check In</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: linear-gradient(135deg, #1e003a 0%, #0d001a 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Animated background elements */
+        .blob {
+            position: absolute;
+            filter: blur(80px);
+            z-index: 0;
+            opacity: 0.6;
+            animation: float 20s infinite ease-in-out alternate;
+        }
+        .blob-1 { top: -10%; left: -10%; width: 50vw; height: 50vw; background: #8b5cf6; }
+        .blob-2 { bottom: -20%; right: -10%; width: 60vw; height: 60vw; background: #3b82f6; animation-delay: -10s; }
+        .blob-3 { top: 40%; left: 60%; width: 40vw; height: 40vw; background: #ec4899; animation-delay: -5s; }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(50px, 50px) scale(1.1); }
+        }
+
+        /* Glassmorphism Card */
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 40px;
+            width: 100%;
+            max-width: 480px;
+            z-index: 10;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            animation: slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(40px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .clock {
+            font-size: 3rem;
+            font-weight: 800;
+            margin-bottom: 5px;
+            background: linear-gradient(to right, #a855f7, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 4px 20px rgba(236, 72, 153, 0.2);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .date {
+            font-size: 1.1rem;
+            color: rgba(255,255,255,0.7);
+            margin-bottom: 30px;
+            font-weight: 300;
+        }
+
+        .input-group {
+            text-align: left;
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            color: rgba(255,255,255,0.8);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        select, input, textarea {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: white;
+            padding: 14px 16px;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-family: inherit;
+            outline: none;
+            transition: all 0.3s;
+        }
+        
+        select:focus, textarea:focus {
+            border-color: #a855f7;
+            box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.2);
+            background: rgba(0, 0, 0, 0.4);
+        }
+
+        select option {
+            background: #1e003a;
+            color: white;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+            color: white;
+            font-size: 1.2rem;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            margin-top: 15px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 10px 25px -5px rgba(236, 72, 153, 0.4);
+        }
+
+        .btn-submit::after {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: 0.5s;
+        }
+
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 35px -5px rgba(236, 72, 153, 0.6);
+        }
+
+        .btn-submit:hover::after {
+            left: 100%;
+        }
+
+        .btn-submit:active {
+            transform: translateY(1px);
+        }
+
+        /* Success State */
+        .success-state {
+            display: none;
+            animation: slideUp 0.5s ease forwards;
+        }
+
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: #22c55e;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            box-shadow: 0 0 30px rgba(34, 197, 94, 0.4);
+        }
+
+        .success-icon svg {
+            color: white;
+            width: 40px;
+            height: 40px;
+        }
+
+        .admin-link {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: rgba(255,255,255,0.4);
+            text-decoration: none;
+            font-size: 0.8rem;
+            transition: color 0.2s;
+            z-index: 20;
+        }
+        .admin-link:hover { color: white; }
+
+        #errorMsg {
+            color: #ef4444;
+            font-size: 0.9rem;
+            margin-top: 15px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <a href="/admin" class="admin-link">Admin Portal</a>
+
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+
+    <div class="card" id="mainCard">
+        <div id="checkInForm">
+            <div class="clock" id="clock">00:00:00</div>
+            <div class="date" id="currentDate">Loading...</div>
+
+            <div class="input-group">
+                <label for="employeeSelect">Who are you?</label>
+                <select id="employeeSelect">
+                    <option value="">Loading employees...</option>
+                </select>
+            </div>
+
+            <div class="input-group">
+                <label for="remarkInput">Remark (Optional)</label>
+                <textarea id="remarkInput" placeholder="Working from home, arrived late, etc."></textarea>
+            </div>
+
+            <button class="btn-submit" onclick="submitAttendance()" id="submitBtn">
+                Mark Present
+            </button>
+            <div id="errorMsg"></div>
+        </div>
+
+        <div id="successState" class="success-state">
+            <div class="success-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+            </div>
+            <h2 style="font-size: 1.8rem; margin-bottom: 10px;">You're Checked In!</h2>
+            <p style="color: rgba(255,255,255,0.7); text-align: center;">Have a wonderful day at work.</p>
+        </div>
+    </div>
+
+    <script>
+        // --- Clock & Date ---
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').textContent = now.toLocaleTimeString('en-US', { hour12: false });
+            document.getElementById('currentDate').textContent = now.toLocaleDateString('en-US', { 
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+            });
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // --- Fetch Employees ---
+        async function loadEmployees() {
+            try {
+                const res = await fetch('/api/employees');
+                const json = await res.json();
+                const sel = document.getElementById('employeeSelect');
+                if (json.success) {
+                    sel.innerHTML = '<option value="">-- Select Your Name --</option>';
+                    json.data.forEach(emp => {
+                        const opt = document.createElement('option');
+                        opt.value = emp.id;
+                        opt.textContent = `${emp.name} (${emp.email})`;
+                        sel.appendChild(opt);
+                    });
+                } else {
+                    sel.innerHTML = '<option value="">Error loading</option>';
+                }
+            } catch(e) {
+                console.error(e);
+            }
+        }
+        loadEmployees();
+
+        // --- Submit Logic ---
+        async function submitAttendance() {
+            const empId = document.getElementById('employeeSelect').value;
+            const remark = document.getElementById('remarkInput').value;
+            const btn = document.getElementById('submitBtn');
+            const err = document.getElementById('errorMsg');
+            
+            if (!empId) {
+                err.textContent = "Please select your name first!";
+                err.style.display = "block";
+                return;
+            }
+
+            err.style.display = "none";
+            btn.disabled = true;
+            btn.textContent = "Checking in...";
+
+            try {
+                const res = await fetch('/api/check-in', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ employee_id: empId, remark: remark })
+                });
+                const json = await res.json();
+                
+                if (json.success) {
+                    // Trigger Confetti
+                    confetti({
+                        particleCount: 150,
+                        spread: 70,
+                        origin: { y: 0.6 },
+                        colors: ['#a855f7', '#ec4899', '#3b82f6', '#22c55e']
+                    });
+
+                    // Show success state
+                    document.getElementById('checkInForm').style.display = 'none';
+                    document.getElementById('successState').style.display = 'block';
+
+                    // Reset after 5 seconds for the next person
+                    setTimeout(() => {
+                        document.getElementById('checkInForm').style.display = 'block';
+                        document.getElementById('successState').style.display = 'none';
+                        document.getElementById('employeeSelect').value = '';
+                        document.getElementById('remarkInput').value = '';
+                        btn.disabled = false;
+                        btn.textContent = "Mark Present";
+                    }, 5000);
+                } else {
+                    err.textContent = json.error || "Failed to check in.";
+                    err.style.display = "block";
+                    btn.disabled = false;
+                    btn.textContent = "Mark Present";
+                }
+            } catch(e) {
+                err.textContent = "Network error. Please try again.";
+                err.style.display = "block";
+                btn.disabled = false;
+                btn.textContent = "Mark Present";
+            }
+        }
+    </script>
+</body>
+</html>
