@@ -15,6 +15,9 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_KEY || 'placeholder-key'
 );
 
+// ─── Global State ─────────────────────────────────────────────────────────────
+let lastSync = { success: true, time: null, error: null };
+
 // ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -32,6 +35,55 @@ function requireAdmin(req, res, next) {
         next();
     } catch {
         res.status(401).json({ success: false, error: 'Invalid or expired token.' });
+    }
+}
+
+// ─── UTILITY: Sync to Master Excel ────────────────────────────────────────────
+async function syncToMasterExcel() {
+    try {
+        const { data, error } = await supabase
+            .from('attendance')
+            .select('*')
+            .order('name', { ascending: true });
+
+        if (error) throw error;
+
+        const wb = new ExcelJS.Workbook();
+        wb.creator = 'Attendance Web App';
+        const ws = wb.addWorksheet('Master Attendance', { views: [{ state: 'frozen', ySplit: 1 }] });
+
+        ws.columns = [
+            { header: 'ID',         key: 'id',         width: 8  },
+            { header: 'Name',       key: 'name',       width: 25 },
+            { header: 'Email',      key: 'email',      width: 32 },
+            { header: 'Department', key: 'department', width: 20 },
+            { header: 'Role',       key: 'role',       width: 20 },
+            { header: 'Phone',      key: 'phone',      width: 18 },
+            { header: 'Notes',      key: 'notes',      width: 40 },
+            { header: 'Created At', key: 'created_at', width: 24 },
+            { header: 'Updated At', key: 'updated_at', width: 24 },
+        ];
+
+        // Style header
+        ws.getRow(1).eachCell(cell => {
+            cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3B82F6' } }; // Blue header
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        });
+
+        data.forEach(row => ws.addRow(row));
+
+        const filePath = path.join(__dirname, 'master_attendance.xlsx');
+        await wb.xlsx.writeFile(filePath);
+        lastSync = { success: true, time: new Date().toISOString(), error: null };
+        console.log(`✅ Master Excel synced: ${filePath}`);
+    } catch (err) {
+        lastSync = { 
+            success: false, 
+            time: new Date().toISOString(), 
+            error: err.code === 'EBUSY' ? 'File is locked (close Excel!)' : err.message 
+        };
+        console.error('❌ Sync failed:', err.message);
     }
 }
 
@@ -53,6 +105,7 @@ app.post('/api/submit', async (req, res) => {
         console.error('Supabase insert error:', error.message);
         return res.status(500).json({ success: false, error: 'Could not save your submission. Please try again.' });
     }
+    await syncToMasterExcel(); // Sync Excel after new submission
     res.status(201).json({ success: true, message: `Thank you, ${name}! Your profile has been recorded.`, id: data.id });
 });
 
@@ -205,6 +258,7 @@ app.put('/api/admin/entries/:id', requireAdmin, async (req, res) => {
         .eq('id', req.params.id);
 
     if (error) return res.status(500).json({ success: false, error: error.message });
+    await syncToMasterExcel(); // Sync Excel after update
     res.json({ success: true, message: `Entry #${req.params.id} updated.` });
 });
 
@@ -217,6 +271,7 @@ app.delete('/api/admin/entries/:id', requireAdmin, async (req, res) => {
         .eq('id', req.params.id);
 
     if (error) return res.status(500).json({ success: false, error: error.message });
+    await syncToMasterExcel(); // Sync Excel after deletion
     res.json({ success: true, message: `Entry #${req.params.id} deleted.` });
 });
 
@@ -256,31 +311,52 @@ app.get('/api/admin/export', requireAdmin, async (req, res) => {
 
     data.forEach(row => ws.addRow(row));
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="attendance_${new Date().toISOString().slice(0,10)}.xlsx"`);
+    const filename = `attendance_${new Date().toISOString().slice(0,10)}.xlsx`;
+    
+    // Fix: Use application/octet-stream and properly quoted filename to avoid ISO bug
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Transfer-Encoding', 'binary');
+    
     await wb.xlsx.write(res);
     res.end();
 });
 
-// ─── Routes ──────────────────────────────────────────────────────────────────
-// Root: public user submission page placeholder (to be built next)
-app.get('/', (req, res) => {
-    res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Attendance Portal</title><style>body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f0f2f8;margin:0}div{text-align:center;background:white;padding:48px 40px;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.08)}h1{font-size:22px;font-weight:800;color:#1a202c;margin-bottom:8px}p{color:#718096;font-size:14px;margin-bottom:24px}a{display:inline-block;padding:12px 28px;background:#1D9E75;color:white;text-decoration:none;border-radius:9px;font-weight:700;font-size:14px}</style></head><body><div><h1>📋 Attendance Portal</h1><p>Employee user portal coming soon.</p><a href="/admin">Admin Dashboard →</a></div></body></html>`);
+// ─── ADMIN: Download the MASTER file ──────────────────────────────────────────
+// GET /api/admin/download-master
+app.get('/api/admin/download-master', requireAdmin, (req, res) => {
+    const filePath = path.join(__dirname, 'master_attendance.xlsx');
+    res.setHeader('Content-Disposition', 'attachment; filename="master_attendance.xlsx"');
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.sendFile(filePath);
 });
 
-// /admin serves the full admin dashboard
+// ─── ADMIN: Get Sync Status ───────────────────────────────────────────────────
+// GET /api/admin/sync-status
+app.get('/api/admin/sync-status', requireAdmin, (req, res) => {
+    res.json(lastSync);
+});
+
+// ─── Dashboard app & Admin page routes ────────────────────────────────────────
+app.get('/', (req, res) => {
+    // We combine index and dashboard logic. The main UI is now dashboard.html.
+    res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
+
+app.get('/dashboard', (req, res) => {
+    res.redirect('/');
+});
+
 app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
 
-// /dashboard redirects to /admin
-app.get('/dashboard', (req, res) => {
-    res.redirect('/admin');
-});
-
 // ─── Start ────────────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`\n✅  Server running at http://localhost:${PORT}`);
     console.log(`🔒  Admin dashboard: http://localhost:${PORT}/admin`);
     console.log(`📊  Database: Supabase (${process.env.SUPABASE_URL || 'not configured — set .env'})\n`);
+    
+    // Initial sync
+    await syncToMasterExcel();
 });
