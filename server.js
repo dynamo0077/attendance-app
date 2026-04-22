@@ -83,7 +83,52 @@ async function syncToMasterExcel() {
             time: new Date().toISOString(), 
             error: err.code === 'EBUSY' ? 'File is locked (close Excel!)' : err.message 
         };
-        console.error('❌ Sync failed:', err.message);
+        console.error('❌ Sync to Excel failed:', err.message);
+    }
+}
+
+// ─── UTILITY: Load Data FROM Master Excel ─────────────────────────────────────
+async function loadDataFromExcel() {
+    try {
+        const filePath = path.join(__dirname, 'master_attendance.xlsx');
+        const wb = new ExcelJS.Workbook();
+        await wb.xlsx.readFile(filePath);
+        const ws = wb.getWorksheet(1);
+        
+        const employees = [];
+        ws.eachRow((row, rowNumber) => {
+            if (rowNumber === 1) return; // Skip header
+            const id         = row.getCell(1).value;
+            const name       = row.getCell(2).value;
+            const email      = row.getCell(3).value;
+            const department = row.getCell(4).value;
+            const role       = row.getCell(5).value;
+            const phone      = row.getCell(6).value;
+            const notes      = row.getCell(7).value;
+
+            if (name && email) {
+                employees.push({ name, email, department: department || '', role: role || '', phone: phone || '', notes: notes || '' });
+            }
+        });
+
+        console.log(`📂 Found ${employees.length} employees in Master Excel. Upserting to Supabase...`);
+
+        // Upsert one by one using email as key
+        for (const emp of employees) {
+            const { error } = await supabase
+                .from('attendance')
+                .upsert(emp, { onConflict: 'email' });
+            if (error) console.error(`❌ Failed to upsert ${emp.email}:`, error.message);
+        }
+
+        lastSync = { success: true, time: new Date().toISOString(), error: null };
+        console.log('✅ Bi-directional sync complete: Website matches Excel.');
+        return { success: true, count: employees.length };
+    } catch (err) {
+        const errorMsg = err.code === 'ENOENT' ? 'Master file not found' : err.message;
+        lastSync = { success: false, time: new Date().toISOString(), error: errorMsg };
+        console.error('❌ Sync from Excel failed:', errorMsg);
+        return { success: false, error: errorMsg };
     }
 }
 
@@ -342,6 +387,17 @@ app.get('/api/admin/sync-status', requireAdmin, (req, res) => {
     res.json(lastSync);
 });
 
+// ─── ADMIN: Force Sync FROM Excel ─────────────────────────────────────────────
+// POST /api/admin/sync-from-excel
+app.get('/api/admin/sync-from-excel', requireAdmin, async (req, res) => {
+    const result = await loadDataFromExcel();
+    if (result.success) {
+        res.json({ success: true, message: `Sync complete. Loaded ${result.count} employees from Excel.` });
+    } else {
+        res.status(500).json({ success: false, error: result.error });
+    }
+});
+
 // ─── Dashboard app & Admin page routes ────────────────────────────────────────
 app.get('/', (req, res) => {
     // We combine index and dashboard logic. The main UI is now dashboard.html.
@@ -362,6 +418,9 @@ app.listen(PORT, async () => {
     console.log(`🔒  Admin dashboard: http://localhost:${PORT}/admin`);
     console.log(`📊  Database: Supabase (${process.env.SUPABASE_URL || 'not configured — set .env'})\n`);
     
-    // Initial sync
+    // Initial bi-directional sync
+    // 1. Try to load from Excel if it exists
+    await loadDataFromExcel();
+    // 2. Ensure Excel matches Supabase (creates file if missing)
     await syncToMasterExcel();
 });

@@ -864,6 +864,9 @@
           <button class="btn-secondary" onclick="downloadMaster()" title="Download the persistent master file from the server">
             📥 Master Archive (.xlsx)
           </button>
+          <button class="btn-secondary" style="color:var(--amber); border-color:var(--amber);" onclick="syncFromExcel()" title="Update website with manual changes you made in Excel">
+            🔄 Sync from Excel
+          </button>
           <input type="text" class="search-input" id="manageSearch" placeholder="🔍 Search employees..." oninput="filterManageTable()">
           <button class="btn-export" onclick="loadManageEntries()">⟳ Refresh List</button>
         </div>
@@ -1434,6 +1437,18 @@ function copyLiveLink() {
     alert('Live link copied! In Excel, go to Data -> From Web and paste this link.');
   });
 }
+
+async function syncFromExcel() {
+  if (!confirm('This will update the website database with information from your master_attendance.xlsx file. Continue?')) return;
+  const json = await api('GET', '/api/admin/sync-from-excel');
+  if (json.success) {
+    alert(json.message);
+    initApp();
+  } else {
+    alert('Sync failed: ' + json.error);
+  }
+}
+
 
 
 function renderMainView(m) {
