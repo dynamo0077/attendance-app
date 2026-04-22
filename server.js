@@ -18,7 +18,8 @@ const supabase = createClient(
 // ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
+// Do not serve static files immediately for `/`, we want to handle `/` explicitly
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 // ─── Auth Middleware ──────────────────────────────────────────────────────────
 function requireAdmin(req, res, next) {
@@ -52,7 +53,96 @@ app.post('/api/submit', async (req, res) => {
         console.error('Supabase insert error:', error.message);
         return res.status(500).json({ success: false, error: 'Could not save your submission. Please try again.' });
     }
-    res.status(201).json({ success: true, message: `Thank you, ${name}! Your attendance has been recorded.`, id: data.id });
+    res.status(201).json({ success: true, message: `Thank you, ${name}! Your profile has been recorded.`, id: data.id });
+});
+
+// ─── PUBLIC: Get all employees ────────────────────────────────────────────────
+app.get('/api/employees', async (req, res) => {
+    const { data, error } = await supabase
+        .from('attendance')
+        .select('*')
+        .order('name', { ascending: true });
+
+    if (error) return res.status(500).json({ success: false, error: error.message });
+    res.json({ success: true, data });
+});
+
+// ─── PUBLIC: Get daily attendance ─────────────────────────────────────────────
+// GET /api/daily?month=2026-04
+app.get('/api/daily', async (req, res) => {
+    const { month } = req.query; // e.g., '2026-04'
+    if (!month) return res.status(400).json({ success: false, error: 'Month parameter is required' });
+
+    const startDate = `${month}-01`;
+    // Approximate end of month
+    const endDate = `${month}-31`; 
+
+    const { data, error } = await supabase
+        .from('daily_attendance')
+        .select('*')
+        .gte('date', startDate)
+        .lte('date', endDate);
+
+    if (error) return res.status(500).json({ success: false, error: error.message });
+    res.json({ success: true, data });
+});
+
+// ─── PUBLIC: Upsert daily attendance (Toggle) ─────────────────────────────────
+app.post('/api/daily/toggle', async (req, res) => {
+    const { employee_id, date, present } = req.body;
+    if (!employee_id || !date) return res.status(400).json({ success: false, error: 'Employee ID and Date required.' });
+
+    // First check if it exists
+    const { data: existing } = await supabase
+        .from('daily_attendance')
+        .select('id')
+        .eq('employee_id', employee_id)
+        .eq('date', date)
+        .single();
+
+    let error;
+    if (existing) {
+        ({ error } = await supabase
+            .from('daily_attendance')
+            .update({ present })
+            .eq('id', existing.id));
+    } else {
+        ({ error } = await supabase
+            .from('daily_attendance')
+            .insert([{ employee_id, date, present }]));
+    }
+
+    if (error) return res.status(500).json({ success: false, error: error.message });
+    res.json({ success: true, message: 'Updated successfully' });
+});
+
+// ─── PUBLIC: Update remark ────────────────────────────────────────────────────
+app.put('/api/daily/remark', async (req, res) => {
+    const { employee_id, date, remark } = req.body;
+    if (!employee_id || !date) return res.status(400).json({ success: false, error: 'Employee ID and Date required.' });
+
+    // First check if it exists
+    const { data: existing } = await supabase
+        .from('daily_attendance')
+        .select('id')
+        .eq('employee_id', employee_id)
+        .eq('date', date)
+        .single();
+
+    let error;
+    if (existing) {
+        ({ error } = await supabase
+            .from('daily_attendance')
+            .update({ remark })
+            .eq('id', existing.id));
+    } else {
+        ({ error } = await supabase
+            .from('daily_attendance')
+            .insert([{ employee_id, date, remark, present: false }])); // defaults to false if only remark added
+    }
+
+    if (error) return res.status(500).json({ success: false, error: error.message });
+    res.json({ success: true, message: 'Remark updated' });
 });
 
 // ─── ADMIN: Login ─────────────────────────────────────────────────────────────
@@ -172,7 +262,16 @@ app.get('/api/admin/export', requireAdmin, async (req, res) => {
     res.end();
 });
 
-// ─── Admin page route ─────────────────────────────────────────────────────────
+// ─── Dashboard app & Admin page routes ────────────────────────────────────────
+app.get('/', (req, res) => {
+    // We combine index and dashboard logic. The main UI is now dashboard.html.
+    res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
+
+app.get('/dashboard', (req, res) => {
+    res.redirect('/');
+});
+
 app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });

@@ -29,6 +29,29 @@ begin
     execute 'create policy "Public insert" on attendance for insert with check (true)';
   end if;
 end $$;
+
+create table if not exists daily_attendance (
+  id           bigserial primary key,
+  employee_id  bigint references attendance(id) on delete cascade,
+  date         date not null,
+  present      boolean default false,
+  remark       text default '',
+  marked_at    timestamptz default now(),
+  unique(employee_id, date)
+);
+
+alter table daily_attendance enable row level security;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies where tablename = 'daily_attendance' and policyname = 'Public insert'
+  ) then
+    execute 'create policy "Public insert" on daily_attendance for insert with check (true)';
+    execute 'create policy "Public update" on daily_attendance for update using (true)';
+    execute 'create policy "Public read" on daily_attendance for select using (true)';
+  end if;
+end $$;
 `;
 
 const body = JSON.stringify({ query: sql });
