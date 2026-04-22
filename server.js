@@ -172,8 +172,10 @@ app.get('/api/daily', async (req, res) => {
     if (!month) return res.status(400).json({ success: false, error: 'Month parameter is required' });
 
     const startDate = `${month}-01`;
-    // Approximate end of month
-    const endDate = `${month}-31`; 
+    // Calculate accurate end of month
+    const [yyyy, mm] = month.split('-');
+    const lastDay = new Date(yyyy, mm, 0).getDate();
+    const endDate = `${month}-${lastDay}`; 
 
     const { data, error } = await supabase
         .from('daily_attendance')
