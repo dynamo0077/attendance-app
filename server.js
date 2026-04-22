@@ -262,18 +262,20 @@ app.get('/api/admin/export', requireAdmin, async (req, res) => {
     res.end();
 });
 
-// ─── Dashboard app & Admin page routes ────────────────────────────────────────
+// ─── Routes ──────────────────────────────────────────────────────────────────
+// Root: public user submission page placeholder (to be built next)
 app.get('/', (req, res) => {
-    // We combine index and dashboard logic. The main UI is now dashboard.html.
+    res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Attendance Portal</title><style>body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f0f2f8;margin:0}div{text-align:center;background:white;padding:48px 40px;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.08)}h1{font-size:22px;font-weight:800;color:#1a202c;margin-bottom:8px}p{color:#718096;font-size:14px;margin-bottom:24px}a{display:inline-block;padding:12px 28px;background:#1D9E75;color:white;text-decoration:none;border-radius:9px;font-weight:700;font-size:14px}</style></head><body><div><h1>📋 Attendance Portal</h1><p>Employee user portal coming soon.</p><a href="/admin">Admin Dashboard →</a></div></body></html>`);
+});
+
+// /admin serves the full admin dashboard
+app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
 
+// /dashboard redirects to /admin
 app.get('/dashboard', (req, res) => {
-    res.redirect('/');
-});
-
-app.get('/admin', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+    res.redirect('/admin');
 });
 
 // ─── Start ────────────────────────────────────────────────────────────────────
