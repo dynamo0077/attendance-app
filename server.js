@@ -313,9 +313,10 @@ app.get('/api/admin/export', requireAdmin, async (req, res) => {
 
     const filename = `attendance_${new Date().toISOString().slice(0,10)}.xlsx`;
     
-    // Fix: Use application/octet-stream and properly quoted filename to avoid ISO bug
-    res.setHeader('Content-Type', 'application/octet-stream');
+    // Final Fix for ISO bug: Use official MIME type, nosniff, and strict quoting
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Content-Transfer-Encoding', 'binary');
     
     await wb.xlsx.write(res);
@@ -326,8 +327,12 @@ app.get('/api/admin/export', requireAdmin, async (req, res) => {
 // GET /api/admin/download-master
 app.get('/api/admin/download-master', requireAdmin, (req, res) => {
     const filePath = path.join(__dirname, 'master_attendance.xlsx');
+    
+    // Final Fix for ISO bug for master file
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="master_attendance.xlsx"');
-    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    
     res.sendFile(filePath);
 });
 

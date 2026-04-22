@@ -737,13 +737,13 @@
         <option value="11">December 2026</option>
       </select>
     </div>
-    <button class="btn-export" id="exportBtn" onclick="exportCSV()">
+    <button class="btn-export" id="exportBtn" onclick="exportData()" title="Generate a fresh Excel report from the live database">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
         <polyline points="7 10 12 15 17 10"/>
         <line x1="12" y1="15" x2="12" y2="3"/>
       </svg>
-      Export CSV
+      Live Report (.xlsx)
     </button>
     <div class="nav-tabs">
       <button class="nav-tab active" id="tab-frontend" onclick="switchTab('frontend')">Front end</button>
@@ -857,9 +857,15 @@
     <div class="manage-table-card">
       <div class="manage-toolbar">
         <div class="section-label">Employee Management</div>
-        <div style="display:flex; gap:10px;">
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button class="btn-secondary btn-copy-link" onclick="copyLiveLink()" title="Link this to Excel via Data -> From Web for real-time updates">
+            🔗 Copy Live Data Link
+          </button>
+          <button class="btn-secondary" onclick="downloadMaster()" title="Download the persistent master file from the server">
+            📥 Master Archive (.xlsx)
+          </button>
           <input type="text" class="search-input" id="manageSearch" placeholder="🔍 Search employees..." oninput="filterManageTable()">
-          <button class="btn-export" onclick="loadManageEntries()">⟳ Refresh</button>
+          <button class="btn-export" onclick="loadManageEntries()">⟳ Refresh List</button>
         </div>
       </div>
       <div style="overflow-x:auto;">
@@ -1395,18 +1401,9 @@ async function onMonthChange() {
   switchTab(curTab);
 }
 
-function exportCSV() {
-  const m = curMonth; const days = daysInMonth(m);
-  let csv = 'Name,' + Array.from({length:days},(_,i)=>i+1).join(',') + ',Total\n';
-  filteredEmployees().forEach(name => {
-    let tot = 0; const vals = ATT[m][name].map(v => { if(v) tot++; return v?1:0; });
-    csv += `"${name}",${vals.join(',')},${tot}\n`;
-  });
-  const a = document.createElement('a');
-  // Using application/octet-stream to ensure browser doesn't try to auto-mount as ISO
-  a.href = URL.createObjectURL(new Blob([csv], { type: 'application/octet-stream' }));
-  a.download = `attendance_${MONTHS[m]}_${YEAR}.csv`;
-  a.click();
+function exportData() {
+  // Directly trigger the server-side Excel export instead of the local CSV hack
+  window.location.href = `/api/admin/export?token=${token}`;
 }
 
 // ─── MASTER FILE TOOLS ────────────────────────────────────────────────────────
