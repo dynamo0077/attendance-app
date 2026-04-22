@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Employee Portal - Check In</title>
+    <title>Employee Portal - Calendar</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
@@ -15,16 +15,16 @@
             color: #ffffff;
             min-height: 100vh;
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: center;
             padding: 20px;
-            overflow: hidden;
+            overflow-x: hidden;
             position: relative;
         }
 
         /* Animated background elements */
         .blob {
-            position: absolute;
+            position: fixed;
             filter: blur(80px);
             z-index: 0;
             opacity: 0.6;
@@ -39,6 +39,14 @@
             100% { transform: translate(50px, 50px) scale(1.1); }
         }
 
+        .container {
+            width: 100%;
+            max-width: 800px;
+            z-index: 10;
+            position: relative;
+            margin-top: 5vh;
+        }
+
         /* Glassmorphism Card */
         .card {
             background: rgba(255, 255, 255, 0.05);
@@ -48,49 +56,13 @@
             border-radius: 24px;
             padding: 40px;
             width: 100%;
-            max-width: 480px;
-            z-index: 10;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-            text-align: center;
             animation: slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         @keyframes slideUp {
             from { transform: translateY(40px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
-        }
-
-        .clock {
-            font-size: 3rem;
-            font-weight: 800;
-            margin-bottom: 5px;
-            background: linear-gradient(to right, #a855f7, #ec4899);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-shadow: 0 4px 20px rgba(236, 72, 153, 0.2);
-            font-variant-numeric: tabular-nums;
-        }
-
-        .date {
-            font-size: 1.1rem;
-            color: rgba(255,255,255,0.7);
-            margin-bottom: 30px;
-            font-weight: 300;
-        }
-
-        .input-group {
-            text-align: left;
-            margin-bottom: 20px;
-        }
-
-        .input-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-size: 0.9rem;
-            color: rgba(255,255,255,0.8);
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 1px;
         }
 
         select, input, textarea {
@@ -106,7 +78,7 @@
             transition: all 0.3s;
         }
         
-        select:focus, textarea:focus {
+        select:focus, input:focus {
             border-color: #a855f7;
             box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.2);
             background: rgba(0, 0, 0, 0.4);
@@ -117,12 +89,7 @@
             color: white;
         }
 
-        textarea {
-            resize: vertical;
-            min-height: 80px;
-        }
-
-        .btn-submit {
+        .btn-primary {
             width: 100%;
             padding: 16px;
             border: none;
@@ -132,57 +99,14 @@
             font-size: 1.2rem;
             font-weight: 800;
             cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.3s;
             margin-top: 15px;
-            position: relative;
-            overflow: hidden;
             box-shadow: 0 10px 25px -5px rgba(236, 72, 153, 0.4);
         }
 
-        .btn-submit::after {
-            content: '';
-            position: absolute;
-            top: 0; left: -100%;
-            width: 100%; height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: 0.5s;
-        }
-
-        .btn-submit:hover {
+        .btn-primary:hover {
             transform: translateY(-2px);
             box-shadow: 0 15px 35px -5px rgba(236, 72, 153, 0.6);
-        }
-
-        .btn-submit:hover::after {
-            left: 100%;
-        }
-
-        .btn-submit:active {
-            transform: translateY(1px);
-        }
-
-        /* Success State */
-        .success-state {
-            display: none;
-            animation: slideUp 0.5s ease forwards;
-        }
-
-        .success-icon {
-            width: 80px;
-            height: 80px;
-            background: #22c55e;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 20px;
-            box-shadow: 0 0 30px rgba(34, 197, 94, 0.4);
-        }
-
-        .success-icon svg {
-            color: white;
-            width: 40px;
-            height: 40px;
         }
 
         .admin-link {
@@ -197,12 +121,164 @@
         }
         .admin-link:hover { color: white; }
 
-        #errorMsg {
-            color: #ef4444;
-            font-size: 0.9rem;
-            margin-top: 15px;
-            display: none;
+        /* --- VIEWS --- */
+        #loginView { display: block; text-align: center; }
+        #calendarView { display: none; }
+
+        /* --- CALENDAR SPECIFICS --- */
+        .cal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 20px;
         }
+
+        .em-title {
+            font-size: 1.8rem;
+            font-weight: 800;
+            background: linear-gradient(to right, #a855f7, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .month-selector {
+            width: 200px;
+        }
+
+        .logout-btn {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: 0.2s;
+        }
+        .logout-btn:hover { background: rgba(255,255,255,0.1); }
+
+        .loading-text {
+            text-align: center;
+            padding: 40px;
+            color: rgba(255,255,255,0.5);
+        }
+
+        /* Day Row */
+        .day-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 12px 15px;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 12px;
+            margin-bottom: 8px;
+            transition: 0.2s;
+        }
+
+        .day-row:hover {
+            background: rgba(255,255,255,0.06);
+            border-color: rgba(255,255,255,0.1);
+        }
+
+        .day-row.weekend {
+            opacity: 0.6;
+        }
+
+        .day-row.today {
+            border-color: #a855f7;
+            background: rgba(168, 85, 247, 0.05);
+            box-shadow: 0 0 15px rgba(168, 85, 247, 0.2);
+        }
+
+        .day-date {
+            width: 80px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .day-num { font-size: 1.2rem; font-weight: 800; }
+        .day-name { font-size: 0.75rem; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 1px; }
+
+        .toggle-wrap {
+            display: flex;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        /* Custom Checkbox */
+        .custom-cb {
+            appearance: none;
+            background-color: rgba(0,0,0,0.3);
+            margin: 0;
+            font: inherit;
+            color: currentColor;
+            width: 32px;
+            height: 32px;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            display: grid;
+            place-content: center;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .custom-cb::before {
+            content: "";
+            width: 18px;
+            height: 18px;
+            transform: scale(0);
+            transition: 120ms transform ease-in-out;
+            box-shadow: inset 1em 1em white;
+            background-color: CanvasText;
+            transform-origin: center;
+            clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+        }
+
+        .custom-cb:checked::before {
+            transform: scale(1);
+        }
+        
+        .custom-cb:checked {
+            background-color: #22c55e;
+            border-color: #22c55e;
+            box-shadow: 0 0 15px rgba(34, 197, 94, 0.4);
+        }
+
+        .remark-input {
+            flex-grow: 1;
+            padding: 10px 14px;
+            background: rgba(0,0,0,0.15);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .remark-input:focus {
+            background: rgba(0,0,0,0.3);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #22c55e;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: 0.4s;
+            z-index: 100;
+        }
+        .toast.show { transform: translateY(0); opacity: 1; }
+        .toast.error { background: #ef4444; }
+
     </style>
 </head>
 <body>
@@ -213,61 +289,78 @@
     <div class="blob blob-2"></div>
     <div class="blob blob-3"></div>
 
-    <div class="card" id="mainCard">
-        <div id="checkInForm">
-            <div class="clock" id="clock">00:00:00</div>
-            <div class="date" id="currentDate">Loading...</div>
-
-            <div class="input-group">
-                <label for="employeeSelect">Who are you?</label>
+    <div class="container">
+        
+        <!-- LOGIN VIEW -->
+        <div class="card" id="loginView">
+            <h1 style="font-size: 2.2rem; margin-bottom: 10px;">Welcome form work</h1>
+            <p style="color: rgba(255,255,255,0.6); margin-bottom: 30px;">Select your personal profile to view your calendar.</p>
+            
+            <div style="text-align: left; margin-bottom: 20px;">
+                <label style="display:block; margin-bottom:8px; font-weight:600; font-size:0.9rem; color:rgba(255,255,255,0.8); text-transform:uppercase;">Who are you?</label>
                 <select id="employeeSelect">
                     <option value="">Loading employees...</option>
                 </select>
             </div>
-
-            <div class="input-group">
-                <label for="remarkInput">Remark (Optional)</label>
-                <textarea id="remarkInput" placeholder="Working from home, arrived late, etc."></textarea>
-            </div>
-
-            <button class="btn-submit" onclick="submitAttendance()" id="submitBtn">
-                Mark Present
-            </button>
-            <div id="errorMsg"></div>
+            
+            <button class="btn-primary" onclick="enterCalendar()">Open Calendar</button>
         </div>
 
-        <div id="successState" class="success-state">
-            <div class="success-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
+
+        <!-- CALENDAR VIEW -->
+        <div class="card" id="calendarView">
+            <div class="cal-header">
+                <div>
+                    <div class="em-title" id="empNameDisplay">John Doe</div>
+                    <div style="color:rgba(255,255,255,0.6); font-size:0.9rem;">Personal Attendance Record</div>
+                </div>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <select class="month-selector" id="monthSelect" onchange="loadCalendarData()">
+                        <option value="0">January 2026</option>
+                        <option value="1">February 2026</option>
+                        <option value="2">March 2026</option>
+                        <option value="3" selected>April 2026</option>
+                        <option value="4">May 2026</option>
+                        <option value="5">June 2026</option>
+                        <option value="6">July 2026</option>
+                        <option value="7">August 2026</option>
+                        <option value="8">September 2026</option>
+                        <option value="9">October 2026</option>
+                        <option value="10">November 2026</option>
+                        <option value="11">December 2026</option>
+                    </select>
+                    <button class="logout-btn" onclick="logoutCalendar()">Log Out</button>
+                </div>
             </div>
-            <h2 style="font-size: 1.8rem; margin-bottom: 10px;">You're Checked In!</h2>
-            <p style="color: rgba(255,255,255,0.7); text-align: center;">Have a wonderful day at work.</p>
+
+            <div id="calendarList">
+                <div class="loading-text">Loading your records...</div>
+            </div>
+
         </div>
+
     </div>
 
-    <script>
-        // --- Clock & Date ---
-        function updateClock() {
-            const now = new Date();
-            document.getElementById('clock').textContent = now.toLocaleTimeString('en-US', { hour12: false });
-            document.getElementById('currentDate').textContent = now.toLocaleDateString('en-US', { 
-                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
-            });
-        }
-        setInterval(updateClock, 1000);
-        updateClock();
+    <!-- TOAST NOTIFICATION -->
+    <div class="toast" id="toast">Saved Successfully</div>
 
-        // --- Fetch Employees ---
-        async function loadEmployees() {
+    <script>
+        const YEAR = 2026;
+        let EMPLOYEES = [];
+        let CURRENT_EMP_ID = null;
+
+        // Auto-select current real month if playing along past April 2026, else stick to selected logic.
+        // We'll leave it simple for now and rely on manual month select.
+
+        async function fetchEmployees() {
             try {
                 const res = await fetch('/api/employees');
                 const json = await res.json();
                 const sel = document.getElementById('employeeSelect');
                 if (json.success) {
+                    EMPLOYEES = json.data;
                     sel.innerHTML = '<option value="">-- Select Your Name --</option>';
-                    json.data.forEach(emp => {
+                    EMPLOYEES.forEach(emp => {
                         const opt = document.createElement('option');
                         opt.value = emp.id;
                         opt.textContent = `${emp.name} (${emp.email})`;
@@ -280,68 +373,162 @@
                 console.error(e);
             }
         }
-        loadEmployees();
 
-        // --- Submit Logic ---
-        async function submitAttendance() {
-            const empId = document.getElementById('employeeSelect').value;
-            const remark = document.getElementById('remarkInput').value;
-            const btn = document.getElementById('submitBtn');
-            const err = document.getElementById('errorMsg');
+        function enterCalendar() {
+            const sel = document.getElementById('employeeSelect');
+            if(!sel.value) { alert("Please select your name."); return; }
             
-            if (!empId) {
-                err.textContent = "Please select your name first!";
-                err.style.display = "block";
-                return;
-            }
+            CURRENT_EMP_ID = sel.value;
+            const emp = EMPLOYEES.find(e => e.id == CURRENT_EMP_ID);
+            
+            document.getElementById('empNameDisplay').textContent = emp.name;
+            document.getElementById('loginView').style.display = 'none';
+            document.getElementById('calendarView').style.display = 'block';
+            
+            loadCalendarData();
+        }
 
-            err.style.display = "none";
-            btn.disabled = true;
-            btn.textContent = "Checking in...";
+        function logoutCalendar() {
+            CURRENT_EMP_ID = null;
+            document.getElementById('loginView').style.display = 'block';
+            document.getElementById('calendarView').style.display = 'none';
+        }
+
+        function daysInMonth(m) {
+            return new Date(YEAR, m + 1, 0).getDate();
+        }
+        
+        function isWeekend(m, d) {
+            const dow = new Date(YEAR, m, d).getDay();
+            return dow === 0 || dow === 6; // Sunday(0) or Saturday(6)
+        }
+        
+        function isToday(m, d) {
+            const now = new Date();
+            // Using exact matching for the demo
+            return (now.getFullYear() === YEAR && now.getMonth() === Number(m) && now.getDate() === d);
+        }
+
+        async function loadCalendarData() {
+            const monthIdx = document.getElementById('monthSelect').value;
+            const mpad = String(Number(monthIdx)+1).padStart(2,'0');
+            const datePrefix = `${YEAR}-${mpad}`;
+            
+            document.getElementById('calendarList').innerHTML = '<div class="loading-text">Loading your records...</div>';
 
             try {
-                const res = await fetch('/api/check-in', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ employee_id: empId, remark: remark })
-                });
+                const res = await fetch(`/api/daily?month=${datePrefix}`);
                 const json = await res.json();
                 
-                if (json.success) {
-                    // Trigger Confetti
-                    confetti({
-                        particleCount: 150,
-                        spread: 70,
-                        origin: { y: 0.6 },
-                        colors: ['#a855f7', '#ec4899', '#3b82f6', '#22c55e']
-                    });
-
-                    // Show success state
-                    document.getElementById('checkInForm').style.display = 'none';
-                    document.getElementById('successState').style.display = 'block';
-
-                    // Reset after 5 seconds for the next person
-                    setTimeout(() => {
-                        document.getElementById('checkInForm').style.display = 'block';
-                        document.getElementById('successState').style.display = 'none';
-                        document.getElementById('employeeSelect').value = '';
-                        document.getElementById('remarkInput').value = '';
-                        btn.disabled = false;
-                        btn.textContent = "Mark Present";
-                    }, 5000);
+                if(json.success) {
+                    // Filter just for this user
+                    const myRecords = json.data.filter(r => String(r.employee_id) === String(CURRENT_EMP_ID));
+                    buildCalendarIterface(Number(monthIdx), myRecords);
                 } else {
-                    err.textContent = json.error || "Failed to check in.";
-                    err.style.display = "block";
-                    btn.disabled = false;
-                    btn.textContent = "Mark Present";
+                    alert("Failed to load records.");
                 }
             } catch(e) {
-                err.textContent = "Network error. Please try again.";
-                err.style.display = "block";
-                btn.disabled = false;
-                btn.textContent = "Mark Present";
+                console.error(e);
             }
         }
+
+        function buildCalendarIterface(m, records) {
+            const days = daysInMonth(m);
+            let html = '';
+
+            // Day matching logic
+            const dayMap = {};
+            records.forEach(r => {
+                const dayNum = parseInt(r.date.split('-')[2]);
+                dayMap[dayNum] = r;
+            });
+
+            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+            for(let d = 1; d <= days; d++) {
+                const rec = dayMap[d];
+                const isWe = isWeekend(m, d);
+                const isT = isToday(m, d);
+                const dowStr = dayNames[new Date(YEAR, m, d).getDay()];
+                const dateStr = `${YEAR}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                
+                let classes = 'day-row';
+                if(isWe) classes += ' weekend';
+                if(isT) classes += ' today';
+
+                let isChecked = rec && rec.present ? 'checked' : '';
+                let remarkVal = rec && rec.remark ? rec.remark.replace(/"/g, '&quot;') : '';
+
+                html += `
+                    <div class="${classes}">
+                        <div class="day-date">
+                            <span class="day-num">${String(d).padStart(2,'0')}</span>
+                            <span class="day-name">${dowStr} ${isT ? '(Today)' : ''}</span>
+                        </div>
+                        <div class="toggle-wrap">
+                            <input type="checkbox" class="custom-cb" ${isChecked} 
+                                onchange="toggleDay('${dateStr}', this.checked)">
+                        </div>
+                        <input type="text" class="remark-input" placeholder="Add remark..." 
+                            value="${remarkVal}" 
+                            onblur="saveRemark('${dateStr}', this.value)">
+                    </div>
+                `;
+            }
+
+            document.getElementById('calendarList').innerHTML = html;
+        }
+
+        // --- API Calls ---
+
+        async function toggleDay(dateStr, isPresent) {
+            try {
+                const res = await fetch('/api/daily/toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ employee_id: CURRENT_EMP_ID, date: dateStr, present: isPresent })
+                });
+                const json = await res.json();
+                if(json.success) {
+                    showToast('Saved');
+                    if(isPresent) {
+                        confetti({ particleCount: 30, spread: 40, origin: { y: 0.8 }, colors: ['#22c55e'] });
+                    }
+                } else {
+                    showToast(json.error, true);
+                }
+            } catch(e) {
+                showToast('Network error', true);
+            }
+        }
+
+        async function saveRemark(dateStr, remarkText) {
+            try {
+                const res = await fetch('/api/daily/remark', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ employee_id: CURRENT_EMP_ID, date: dateStr, remark: remarkText })
+                });
+                const json = await res.json();
+                if(json.success) showToast('Remark Saved');
+                else showToast(json.error, true);
+            } catch(e) {
+                showToast('Network error', true);
+            }
+        }
+
+        // --- Helper ---
+        let toastTimeout;
+        function showToast(msg, isError=false) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = isError ? 'toast error show' : 'toast show';
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => t.classList.remove('show'), 2000);
+        }
+
+        // Boot
+        fetchEmployees();
     </script>
 </body>
 </html>
